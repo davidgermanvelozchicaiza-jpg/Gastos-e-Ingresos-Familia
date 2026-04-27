@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#1a2744">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Familia Veloz Rueda">
+<link rel="manifest" href="manifest.json">
+<title>REGISTROS DE INGRESOS Y GASTOS FAMILIA VELOZ RUEDA</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --navy: #1a2744;
+  --navy-light: #243360;
+  --gold: #f0b429;
+  --gold-light: #ffd166;
+  --green: #06d6a0;
+  --red: #ef476f;
+  --blue: #118ab2;
+  --bg: #0f1b33;
+  --card: #1e2d50;
+  --card2: #243360;
+  --text: #e8eaf6;
+  --text-muted: #8899bb;
+  --border: #2e4080;
+  --radius: 14px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.35);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; scroll-behavior: smooth; }
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+/* PWA splash */
+#splash {
+  position: fixed; inset: 0; background: var(--navy);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 9999; gap: 18px;
+  transition: opacity 0.5s;
+}
+#splash h1 { font-family: 'Bebas Neue'; font-size: 2rem; color: var(--gold); text-align:center; padding: 0 20px; }
+#splash .loader { width: 48px; height: 48px; border: 4px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* HEADER */
+#app-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+  border-bottom: 2px solid var(--gold);
+  padding: 10px 16px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: var(--shadow);
+}
+.header-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.app-title {
+  font-family: 'Bebas Neue'; font-size: 1.1rem; color: var(--gold);
+  line-height: 1.1; flex: 1; text-align: center;
+  letter-spacing: 0.04em;
+}
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 50%; width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.25s; font-size: 1rem;
+  position: relative;
+}
+.icon-btn:hover { background: var(--gold); color: var(--navy); transform: scale(1.15); }
+.user-photo-wrap {
+  position: relative; cursor: pointer;
+}
+.user-photo {
+  width: 42px; height: 42px; border-radius: 50%;
+  border: 2px solid var(--gold);
+  object-fit: cover;
+  transition: all 0.3s;
+}
+.user-photo:hover { transform: scale(1.12); box-shadow: 0 0 12px var(--gold); }
+.user-name-tooltip {
+  position: absolute; top: 48px; right: 0;
+  background: var(--gold); color: var(--navy);
+  font-weight: 800; font-size: 0.78rem;
+  padding: 4px 10px; border-radius: 8px;
+  white-space: nowrap; opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+.user-photo-wrap:hover .user-name-tooltip { opacity: 1; }
+
+/* SUMMARY CARDS */
+.summary-bar {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 8px; padding: 10px 12px;
+}
+@media(min-width:600px) { .summary-bar { grid-template-columns: repeat(5, 1fr); } }
+.sum-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+  text-align: center; transition: transform 0.2s;
+  cursor: default;
+}
+.sum-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.sum-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.sum-value { font-size: 1.2rem; font-weight: 900; margin-top: 2px; }
+.sum-card.income .sum-value { color: var(--green); }
+.sum-card.expense .sum-value { color: var(--red); }
+.sum-card.current .sum-value { color: var(--gold); }
+.sum-card.assigned .sum-value { color: var(--blue); }
+.sum-card.savings .sum-value { color: #a78bfa; }
+
+/* TABS */
+.tabs {
+  display: flex; background: var(--navy); border-bottom: 2px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn {
+  flex: 1; min-width: 80px;
+  padding: 10px 8px; background: none; border: none;
+  color: var(--text-muted); font-family: 'Nunito'; font-weight: 700;
+  font-size: 0.75rem; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border-bottom: 3px solid transparent; transition: all 0.25s;
+  position: relative;
+}
+.tab-btn i { font-size: 1.3rem; transition: transform 0.3s, font-size 0.3s; }
+.tab-btn:hover i { transform: scale(1.3); font-size: 1.5rem; }
+.tab-btn:hover { color: var(--gold); }
+.tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+.tab-btn.active i {
+  animation: iconBounce 1.5s ease infinite;
+}
+@keyframes iconBounce {
+  0%,100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.15); }
+}
+
+/* TAB TRANSITION */
+.tab-panel { display: none; padding: 12px; animation: slideIn 0.35s ease; }
+.tab-panel.active { display: block; }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* CARDS / FORMS */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+}
+.card-title {
+  font-size: 0.9rem; font-weight: 800; color: var(--gold);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.form-group { margin-bottom: 10px; }
+.form-label {
+  display: block; font-size: 0.75rem; font-weight: 700;
+  color: var(--text-muted); margin-bottom: 4px;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.form-control {
+  width: 100%; padding: 9px 12px;
+  background: var(--navy); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-family: 'Nunito';
+  font-size: 0.88rem; font-weight: 600; transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.form-control:focus { outline: none; border-color: var(--gold); }
+.form-control option { background: var(--navy); }
+.hint {
+  font-size: 0.68rem; color: var(--text-muted);
+  margin-top: 3px; display: flex; align-items: center; gap: 4px;
+}
+.hint.available-money { color: var(--green); font-weight: 700; font-size: 0.75rem; }
+
+/* SUB-ITEMS (Servicios, Alquiler) */
+.sub-items {
+  background: var(--navy); border-radius: 10px;
+  padding: 10px; margin-top: 6px; display: none;
+}
+.sub-items.show { display: block; }
+.sub-item {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.sub-item:last-child { margin-bottom: 0; }
+.sub-item label { flex: 1; font-size: 0.8rem; font-weight: 700; color: var(--text); }
+.sub-item .form-control { flex: 1; padding: 7px 10px; font-size: 0.85rem; }
+
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 18px; border-radius: 10px; font-family: 'Nunito';
+  font-weight: 800; font-size: 0.85rem; cursor: pointer;
+  border: none; transition: all 0.25s; white-space: nowrap;
+}
+.btn i { transition: transform 0.3s, font-size 0.3s; }
+.btn:hover i { transform: scale(1.3); }
+.btn-gold { background: var(--gold); color: var(--navy); }
+.btn-gold:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(240,180,41,0.4); }
+.btn-green { background: var(--green); color: var(--navy); }
+.btn-green:hover { background: #00e5b0; transform: translateY(-2px); }
+.btn-red { background: var(--red); color: #fff; }
+.btn-red:hover { background: #ff6b8b; transform: translateY(-2px); }
+.btn-blue { background: var(--blue); color: #fff; }
+.btn-blue:hover { background: #1ba8d6; transform: translateY(-2px); }
+.btn-outline {
+  background: transparent; color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+.btn-block { width: 100%; }
+.btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+.btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* PERSON SELECTOR */
+.person-selector {
+  display: flex; gap: 10px; margin-bottom: 12px;
+}
+.person-btn {
+  flex: 1; padding: 10px; background: var(--navy);
+  border: 2px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; text-align: center; transition: all 0.3s;
+  font-family: 'Nunito'; font-weight: 700; color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.person-btn.active {
+  border-color: var(--gold); color: var(--gold);
+  background: rgba(240,180,41,0.1);
+  box-shadow: 0 0 12px rgba(240,180,41,0.25);
+}
+.person-btn i { display: block; font-size: 1.5rem; margin-bottom: 4px; transition: transform 0.3s, font-size 0.3s; }
+.person-btn:hover i { transform: scale(1.3); font-size: 1.8rem; }
+
+/* TYPE SELECTOR */
+.type-selector { display: flex; gap: 8px; margin-bottom: 10px; }
+.type-btn {
+  flex: 1; padding: 10px; background: var(--navy);
+  border: 2px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; text-align: center; transition: all 0.3s;
+  font-family: 'Nunito'; font-weight: 700; color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.type-btn.income.active { border-color: var(--green); color: var(--green); background: rgba(6,214,160,0.1); }
+.type-btn.expense.active { border-color: var(--red); color: var(--red); background: rgba(239,71,111,0.1); }
+.type-btn i { display: block; font-size: 1.4rem; margin-bottom: 3px; transition: transform 0.3s, font-size 0.3s; }
+.type-btn:hover i { transform: scale(1.3); font-size: 1.6rem; }
+
+/* RECORDS LIST */
+.record-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; background: var(--navy);
+  border-radius: 10px; margin-bottom: 8px;
+  border-left: 3px solid var(--border);
+  transition: transform 0.2s;
+  animation: recordAppear 0.4s ease;
+}
+@keyframes recordAppear {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.record-item.income-rec { border-left-color: var(--green); }
+.record-item.expense-rec { border-left-color: var(--red); }
+.record-item:hover { transform: translateX(4px); }
+.record-user-icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--border);
+  cursor: pointer; flex-shrink: 0; position: relative;
+}
+.record-info { flex: 1; min-width: 0; }
+.record-title { font-size: 0.82rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.record-sub { font-size: 0.7rem; color: var(--text-muted); }
+.record-amount { font-weight: 900; font-size: 0.95rem; white-space: nowrap; }
+.record-amount.pos { color: var(--green); }
+.record-amount.neg { color: var(--red); }
+.record-delete { background: none; border: none; color: var(--red); cursor: pointer; padding: 4px; font-size: 0.9rem; opacity: 0.5; transition: opacity 0.2s; }
+.record-delete:hover { opacity: 1; }
+
+/* SAVINGS */
+.savings-detail {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px; background: var(--navy); border-radius: 8px;
+  margin-bottom: 6px; border-left: 3px solid #a78bfa;
+}
+.savings-detail.out { border-left-color: var(--red); }
+.savings-info { flex: 1; }
+.savings-info .s-title { font-size: 0.8rem; font-weight: 700; }
+.savings-info .s-sub { font-size: 0.68rem; color: var(--text-muted); }
+.savings-amount { font-weight: 900; font-size: 0.9rem; color: #a78bfa; }
+.savings-amount.neg { color: var(--red); }
+
+/* PHOTO PREVIEW */
+.photo-preview {
+  width: 80px; height: 80px; object-fit: cover;
+  border-radius: 8px; border: 2px solid var(--border);
+  margin-top: 6px; display: none;
+}
+.photo-preview.show { display: block; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  padding: 16px; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; width: 100%; max-width: 480px;
+  max-height: 90vh; overflow-y: auto;
+  transform: scale(0.9); transition: transform 0.3s;
+}
+.modal-overlay.show .modal-box { transform: scale(1); }
+.modal-title { font-size: 1rem; font-weight: 900; color: var(--gold); margin-bottom: 14px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+
+/* PERIOD SELECTOR */
+.period-card {
+  background: var(--card2); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 12px; margin-bottom: 8px;
+  cursor: pointer; transition: all 0.25s;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.period-card:hover { border-color: var(--gold); }
+.period-card .pc-name { font-weight: 800; font-size: 0.9rem; }
+.period-card .pc-date { font-size: 0.72rem; color: var(--text-muted); }
+
+/* BUDGET PROGRESS */
+.budget-row { margin-bottom: 10px; }
+.budget-row-label {
+  display: flex; justify-content: space-between;
+  font-size: 0.78rem; font-weight: 700; margin-bottom: 3px;
+}
+.budget-bar { height: 6px; background: var(--navy); border-radius: 3px; overflow: hidden; }
+.budget-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+.budget-fill.ok { background: var(--green); }
+.budget-fill.warn { background: var(--gold); }
+.budget-fill.over { background: var(--red); }
+
+/* SEND TO SAVINGS BTN */
+.send-savings-wrap {
+  background: rgba(167,139,250,0.1); border: 1.5px dashed #a78bfa;
+  border-radius: 10px; padding: 10px; margin-top: 8px; text-align: center;
+}
+
+/* TOAST */
+#toast-container {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 999; display: flex; flex-direction: column; gap: 6px; align-items: center;
+}
+.toast {
+  background: var(--card2); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 18px; border-radius: 30px;
+  font-size: 0.82rem; font-weight: 700;
+  animation: toastIn 0.3s ease;
+  white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+}
+@keyframes toastIn { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform:translateY(0); } }
+.toast.success { border-color: var(--green); color: var(--green); }
+.toast.error { border-color: var(--red); color: var(--red); }
+
+/* SETTINGS TOGGLE ITEM */
+.settings-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.settings-item:last-child { border-bottom: none; }
+.settings-item label { flex: 1; font-weight: 700; font-size: 0.85rem; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--navy); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* INSTALL BANNER */
+#install-banner {
+  display: none; position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  background: var(--gold); color: var(--navy); border-radius: 30px;
+  padding: 10px 20px; font-weight: 800; font-size: 0.85rem;
+  z-index: 150; gap: 10px; align-items: center; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(240,180,41,0.5);
+}
+#install-banner.show { display: flex; }
+
+/* Responsive */
+@media(max-width:400px) {
+  .app-title { font-size: 0.85rem; }
+  .summary-bar { grid-template-columns: 1fr 1fr; }
+  .btn { font-size: 0.78rem; padding: 8px 12px; }
+}
+@media(min-width:768px) {
+  body { max-width: 720px; margin: 0 auto; }
+  .app-title { font-size: 1.3rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div style="font-size:3rem;">💰</div>
+  <h1>REGISTROS DE INGRESOS Y GASTOS<br>FAMILIA VELOZ RUEDA</h1>
+  <div class="loader"></div>
+  <p style="font-size:0.75rem;color:#8899bb;">Conectando con Firebase...</p>
+</div>
+
+<!-- TOAST -->
+<div id="toast-container"></div>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner">
+  <i class="fas fa-download"></i> Instalar App
+</div>
+
+<!-- PERIOD SELECTOR MODAL -->
+<div class="modal-overlay" id="period-modal">
+  <div class="modal-box">
+    <div class="modal-title"><i class="fas fa-calendar-week"></i> Seleccionar o Crear Registro</div>
+    <div id="period-list"></div>
+    <div style="margin-top:14px;">
+      <label class="form-label">Nombre del nuevo registro (ej: Quincena Mayo 1-15)</label>
+      <input type="text" class="form-control" id="new-period-name" placeholder="Quincena...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-gold btn-block" onclick="createPeriod()"><i class="fas fa-plus"></i> Crear Nuevo</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-box">
+    <div class="modal-title"><i class="fas fa-exclamation-triangle" style="color:var(--red)"></i> Confirmar</div>
+    <p id="confirm-text" style="font-size:0.88rem;line-height:1.5;margin-bottom:14px;"></p>
+    <div class="modal-actions">
+      <button class="btn btn-red flex-1" id="confirm-yes">Sí, Confirmar</button>
+      <button class="btn btn-outline flex-1" onclick="closeModal('confirm-modal')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVINGS DETAIL MODAL -->
+<div class="modal-overlay" id="savings-modal">
+  <div class="modal-box">
+    <div class="modal-title"><i class="fas fa-piggy-bank"></i> Detalle Fondo de Ahorro</div>
+    <div id="savings-detail-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-block" onclick="closeModal('savings-modal')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-box">
+    <div class="modal-title"><i class="fas fa-cog"></i> Configuración</div>
+    <div class="form-group">
+      <label class="form-label">Nombre de la Familia</label>
+      <input type="text" class="form-control" id="cfg-family-name" placeholder="Familia...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Persona 1 (Nombre)</label>
+      <input type="text" class="form-control" id="cfg-p1-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Persona 1 (Foto - URL o base64)</label>
+      <input type="text" class="form-control" id="cfg-p1-photo" placeholder="data:image/...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Persona 2 (Nombre)</label>
+      <input type="text" class="form-control" id="cfg-p2-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Persona 2 (Foto - URL o base64)</label>
+      <input type="text" class="form-control" id="cfg-p2-photo" placeholder="data:image/...">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Fondo Base de Ahorro ($)</label>
+      <input type="number" class="form-control" id="cfg-savings-base" placeholder="0.00" step="0.01">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tipos de Ingreso (uno por línea)</label>
+      <textarea class="form-control" id="cfg-income-types" rows="5"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tipos de Gasto (uno por línea)</label>
+      <textarea class="form-control" id="cfg-expense-types" rows="8"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-gold flex-1" onclick="saveSettings()"><i class="fas fa-save"></i> Guardar</button>
+      <button class="btn btn-outline flex-1" onclick="closeModal('settings-modal')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" style="display:none;">
+  <!-- HEADER -->
+  <div id="app-header">
+    <div class="header-top">
+      <div class="header-actions">
+        <button class="icon-btn" onclick="showModal('period-modal')" title="Cambiar registro">
+          <i class="fas fa-folder-open"></i>
+        </button>
+        <button class="icon-btn" onclick="exportExcel()" title="Exportar Excel">
+          <i class="fas fa-file-excel" style="color:#1d6f42"></i>
+        </button>
+        <button class="icon-btn" onclick="exportPDF()" title="Exportar PDF">
+          <i class="fas fa-file-pdf" style="color:#c0392b"></i>
+        </button>
+      </div>
+      <div class="app-title" id="header-title">FAMILIA VELOZ RUEDA</div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="openSettings()">
+          <i class="fas fa-cog"></i>
+        </button>
+        <div class="user-photo-wrap" id="current-user-display" style="display:none;">
+          <img class="user-photo" id="current-user-photo" src="" alt="">
+          <div class="user-name-tooltip" id="current-user-tooltip"></div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:4px;" id="period-label">
+      Cargando...
+    </div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-bar">
+    <div class="sum-card income">
+      <div class="sum-label">💵 Ingresos</div>
+      <div class="sum-value" id="sum-income">$0.00</div>
+    </div>
+    <div class="sum-card expense">
+      <div class="sum-label">💸 Gastos</div>
+      <div class="sum-value" id="sum-expense">$0.00</div>
+    </div>
+    <div class="sum-card current">
+      <div class="sum-label">💰 Tengo</div>
+      <div class="sum-value" id="sum-current">$0.00</div>
+    </div>
+    <div class="sum-card assigned">
+      <div class="sum-label">📋 Asignado</div>
+      <div class="sum-value" id="sum-assigned">$0.00</div>
+    </div>
+    <div class="sum-card savings" onclick="showModal('savings-modal')" style="cursor:pointer;">
+      <div class="sum-label">🐷 Ahorro</div>
+      <div class="sum-value" id="sum-savings">$0.00</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('register')" id="tab-register">
+      <i class="fas fa-pen-to-square"></i> Registrar
+    </button>
+    <button class="tab-btn" onclick="switchTab('records')" id="tab-records">
+      <i class="fas fa-list-check"></i> Registros
+    </button>
+    <button class="tab-btn" onclick="switchTab('budget')" id="tab-budget">
+      <i class="fas fa-chart-pie"></i> Presupuesto
+    </button>
+    <button class="tab-btn" onclick="switchTab('savings')" id="tab-savings">
+      <i class="fas fa-piggy-bank"></i> Ahorro
+    </button>
+  </div>
+
+  <!-- TAB: REGISTER -->
+  <div class="tab-panel active" id="panel-register">
+    <!-- Person selector -->
+    <div class="card">
+      <div class="card-title"><i class="fas fa-user-friends"></i> ¿Quién registra?</div>
+      <div class="person-selector">
+        <div class="person-btn active" id="person-btn-0" onclick="selectPerson(0)">
+          <i class="fas fa-user-circle"></i>
+          <span id="person-name-0">David</span>
+        </div>
+        <div class="person-btn" id="person-btn-1" onclick="selectPerson(1)">
+          <i class="fas fa-user-circle"></i>
+          <span id="person-name-1">Doménica</span>
+        </div>
+      </div>
+      <!-- Type selector -->
+      <div class="card-title"><i class="fas fa-exchange-alt"></i> Tipo de registro</div>
+      <div class="type-selector">
+        <div class="type-btn income" id="type-income" onclick="selectType('income')">
+          <i class="fas fa-arrow-trend-up"></i> Ingreso
+        </div>
+        <div class="type-btn expense" id="type-expense" onclick="selectType('expense')">
+          <i class="fas fa-arrow-trend-down"></i> Gasto
+        </div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card" id="register-form-card">
+      <div class="card-title" id="form-type-title"><i class="fas fa-dollar-sign"></i> Detalle</div>
+
+      <!-- Category select -->
+      <div class="form-group">
+        <label class="form-label">Categoría</label>
+        <select class="form-control" id="category-select" onchange="onCategoryChange()">
+          <option value="">-- Seleccionar --</option>
+        </select>
+      </div>
+
+      <!-- Detail field (for Otros / Sacado del Fondo) -->
+      <div class="form-group" id="detail-extra-wrap" style="display:none;">
+        <label class="form-label" id="detail-extra-label">Especificar</label>
+        <input type="text" class="form-control" id="detail-extra" placeholder="Escribe aquí...">
+      </div>
+
+      <!-- Sub-items (Servicios Básicos) -->
+      <div class="sub-items" id="sub-servicios">
+        <div class="card-title" style="font-size:0.78rem;margin-bottom:8px;"><i class="fas fa-bolt"></i> Servicios Básicos</div>
+        <div class="sub-item">
+          <label>💧 Agua</label>
+          <input type="number" class="form-control" id="srv-agua" placeholder="$0.00" step="0.01">
+        </div>
+        <div class="sub-item">
+          <label>💡 Luz</label>
+          <input type="number" class="form-control" id="srv-luz" placeholder="$0.00" step="0.01">
+        </div>
+        <div class="sub-item">
+          <label>🌐 Internet</label>
+          <input type="number" class="form-control" id="srv-internet" placeholder="$0.00" step="0.01">
+        </div>
+      </div>
+
+      <!-- Sub-items (Alquiler) -->
+      <div class="sub-items" id="sub-alquiler">
+        <div class="card-title" style="font-size:0.78rem;margin-bottom:8px;"><i class="fas fa-home"></i> Alquiler</div>
+        <div class="sub-item">
+          <label>🏠 Alquiler</label>
+          <input type="number" class="form-control" id="alq-alquiler" value="220" step="0.01">
+        </div>
+        <div class="sub-item">
+          <label>🏢 Alícuota</label>
+          <input type="number" class="form-control" id="alq-alicuota" value="40" step="0.01">
+        </div>
+      </div>
+
+      <!-- Budget assigned (for expense categories) -->
+      <div class="form-group" id="budget-assign-wrap" style="display:none;">
+        <label class="form-label">Dinero Asignado para este rubro ($)</label>
+        <input type="number" class="form-control" id="budget-assign-input" placeholder="$0.00" step="0.01" oninput="updateBudgetHint()">
+        <div class="hint available-money" id="budget-available-hint"></div>
+      </div>
+
+      <!-- Amount -->
+      <div class="form-group" id="amount-wrap">
+        <label class="form-label" id="amount-label">Monto ($)</label>
+        <input type="number" class="form-control" id="amount-input" placeholder="$0.00" step="0.01" oninput="updateRestante()">
+        <div class="hint" id="restante-hint"></div>
+      </div>
+
+      <!-- Date -->
+      <div class="form-group">
+        <label class="form-label">Fecha del Registro</label>
+        <input type="date" class="form-control" id="date-input">
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label class="form-label">Descripción / Detalle</label>
+        <input type="text" class="form-control" id="desc-input" placeholder="Descripción opcional...">
+      </div>
+
+      <!-- Photo -->
+      <div class="form-group">
+        <label class="form-label">Foto (opcional)</label>
+        <input type="file" class="form-control" id="photo-input" accept="image/*" capture="environment" onchange="onPhotoChange(event)">
+        <img class="photo-preview" id="photo-preview" src="" alt="">
+        <div class="hint"><i class="fas fa-camera"></i> Toma foto o selecciona de galería</div>
+      </div>
+
+      <!-- Restante and send to savings -->
+      <div id="send-savings-section" style="display:none;">
+        <div class="send-savings-wrap">
+          <p style="font-size:0.78rem;color:#a78bfa;margin-bottom:8px;">
+            <i class="fas fa-star"></i> Sobra dinero del presupuesto asignado
+          </p>
+          <p style="font-size:1rem;font-weight:900;color:#a78bfa;" id="sobrante-amount"></p>
+          <button class="btn btn-block" style="background:#a78bfa;color:var(--navy);margin-top:8px;" onclick="sendToSavings()">
+            <i class="fas fa-piggy-bank"></i> Enviar Sobrante a Fondo de Ahorro
+          </button>
+        </div>
+      </div>
+
+      <!-- Mini summary inside register tab -->
+      <div class="card" style="background:var(--navy);margin-top:10px;">
+        <div class="card-title" style="font-size:0.75rem;color:var(--text-muted);">Resumen actual</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.75rem;">
+          <div>💵 Ingresos: <strong id="mini-income">$0.00</strong></div>
+          <div>💸 Gastos: <strong id="mini-expense">$0.00</strong></div>
+          <div>💰 Tengo: <strong id="mini-current">$0.00</strong></div>
+          <div>📋 Asignado: <strong id="mini-assigned">$0.00</strong></div>
+          <div>🐷 Ahorro: <strong id="mini-savings">$0.00</strong></div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-gold flex-1" onclick="saveRecord()">
+          <i class="fas fa-save"></i> Guardar Registro
+        </button>
+        <button class="btn btn-red" onclick="confirmNewQuincena()">
+          <i class="fas fa-rotate-right"></i> Nueva Quincena
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: RECORDS -->
+  <div class="tab-panel" id="panel-records">
+    <div class="card">
+      <div class="card-title"><i class="fas fa-list"></i> Todos los Registros</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn btn-sm btn-outline" onclick="filterRecords('all')">Todos</button>
+        <button class="btn btn-sm btn-green" onclick="filterRecords('income')">Ingresos</button>
+        <button class="btn btn-sm btn-red" onclick="filterRecords('expense')">Gastos</button>
+      </div>
+      <div id="records-list">
+        <p style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.82rem;">No hay registros aún</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: BUDGET -->
+  <div class="tab-panel" id="panel-budget">
+    <div class="card">
+      <div class="card-title"><i class="fas fa-chart-pie"></i> Presupuesto por Categoría</div>
+      <div id="budget-list">
+        <p style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.82rem;">Sin datos de presupuesto</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: SAVINGS -->
+  <div class="tab-panel" id="panel-savings">
+    <div class="card">
+      <div class="card-title"><i class="fas fa-piggy-bank"></i> Fondo de Ahorro</div>
+      <div class="form-group">
+        <label class="form-label">Fondo Base ($)</label>
+        <div style="display:flex;gap:8px;">
+          <input type="number" class="form-control" id="savings-base-input" placeholder="0.00" step="0.01">
+          <button class="btn btn-gold" onclick="updateSavingsBase()"><i class="fas fa-save"></i></button>
+        </div>
+      </div>
+      <div style="text-align:center;margin:14px 0;">
+        <div style="font-size:0.75rem;color:var(--text-muted);">Total Fondo de Ahorro</div>
+        <div style="font-size:2rem;font-weight:900;color:#a78bfa;" id="savings-total-display">$0.00</div>
+      </div>
+      <div class="card-title" style="font-size:0.8rem;"><i class="fas fa-history"></i> Trazabilidad</div>
+      <div id="savings-trace-list">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.8rem;">Sin movimientos</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// FIREBASE CONFIG
+// ============================================================
+const firebaseConfig = {
+  databaseURL: "https://registro-de-gastos-e-ing-8a291-default-rtdb.firebaseio.com/"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ============================================================
+// STATE
+// ============================================================
+let STATE = {
+  currentPeriodId: null,
+  currentPeriodName: '',
+  selectedPerson: 0,
+  selectedType: null,
+  records: {},
+  budgets: {},
+  savingsBase: 0,
+  savingsMovements: [],
+  settings: {
+    familyName: 'FAMILIA VELOZ RUEDA',
+    persons: [
+      { name: 'David', photo: 'data:image/jpeg;base64,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' },
+      { name: 'Doménica', photo: 'data:image/jpeg;base64,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' }
+    ],
+    incomeTypes: ['Sueldo','Clases','Sacado del Fondo','Otros Ingresos'],
+    expenseTypes: ['Diezmo','Comida','Servicios Básicos','Alquiler','Transporte','Pasaje David','Educación de Rachel','Educación de Rebecca','Otros Gastos']
+  }
+};
+
+let currentPhotoData = null;
+let recordsFilter = 'all';
+let dbRef = null;
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load', async () => {
+  setDefaultDate();
+  await loadSettings();
+  applySettings();
+
+  // Load periods from Firebase
+  db.ref('periods').once('value').then(snap => {
+    hideSplash();
+    const periods = snap.val();
+    if (!periods || Object.keys(periods).length === 0) {
+      showModal('period-modal');
+      renderPeriodList({});
+    } else {
+      renderPeriodList(periods);
+      showModal('period-modal');
+    }
+  }).catch(() => {
+    hideSplash();
+    showModal('period-modal');
+    renderPeriodList({});
+  });
+});
+
+function hideSplash() {
+  const s = document.getElementById('splash');
+  s.style.opacity = '0';
+  setTimeout(() => s.style.display = 'none', 500);
+  document.getElementById('main-app').style.display = 'block';
+}
+
+function setDefaultDate() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('date-input').value = `${yyyy}-${mm}-${dd}`;
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+async function loadSettings() {
+  return db.ref('settings').once('value').then(snap => {
+    if (snap.val()) STATE.settings = { ...STATE.settings, ...snap.val() };
+  }).catch(()=>{});
+}
+
+function applySettings() {
+  document.getElementById('header-title').textContent = STATE.settings.familyName;
+  document.title = 'REGISTROS - ' + STATE.settings.familyName;
+  // Person names
+  for (let i=0;i<2;i++) {
+    const p = STATE.settings.persons[i];
+    if (p) {
+      const el = document.getElementById(`person-name-${i}`);
+      if (el) el.textContent = p.name;
+    }
+  }
+  populateCategorySelect();
+  selectPerson(STATE.selectedPerson);
+}
+
+function openSettings() {
+  const s = STATE.settings;
+  document.getElementById('cfg-family-name').value = s.familyName;
+  document.getElementById('cfg-p1-name').value = s.persons[0]?.name || '';
+  document.getElementById('cfg-p1-photo').value = '';
+  document.getElementById('cfg-p2-name').value = s.persons[1]?.name || '';
+  document.getElementById('cfg-p2-photo').value = '';
+  document.getElementById('cfg-savings-base').value = STATE.savingsBase || '';
+  document.getElementById('cfg-income-types').value = s.incomeTypes.join('\n');
+  document.getElementById('cfg-expense-types').value = s.expenseTypes.join('\n');
+  showModal('settings-modal');
+}
+
+function saveSettings() {
+  const s = STATE.settings;
+  s.familyName = document.getElementById('cfg-family-name').value.trim() || s.familyName;
+  s.persons[0].name = document.getElementById('cfg-p1-name').value.trim() || s.persons[0].name;
+  s.persons[1].name = document.getElementById('cfg-p2-name').value.trim() || s.persons[1].name;
+  const p1photo = document.getElementById('cfg-p1-photo').value.trim();
+  const p2photo = document.getElementById('cfg-p2-photo').value.trim();
+  if (p1photo) s.persons[0].photo = p1photo;
+  if (p2photo) s.persons[1].photo = p2photo;
+  s.incomeTypes = document.getElementById('cfg-income-types').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  s.expenseTypes = document.getElementById('cfg-expense-types').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  const sbInput = parseFloat(document.getElementById('cfg-savings-base').value)||0;
+  if (sbInput) STATE.savingsBase = sbInput;
+  db.ref('settings').set(s);
+  if (STATE.currentPeriodId) {
+    db.ref(`periods/${STATE.currentPeriodId}/savingsBase`).set(STATE.savingsBase);
+  }
+  applySettings();
+  closeModal('settings-modal');
+  showToast('Configuración guardada', 'success');
+  updateSummary();
+}
+
+// ============================================================
+// PERIOD MANAGEMENT
+// ============================================================
+function renderPeriodList(periods) {
+  const container = document.getElementById('period-list');
+  const keys = Object.keys(periods||{});
+  if (keys.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:8px;">No hay registros. Crea uno nuevo.</p>';
+    return;
+  }
+  container.innerHTML = keys.map(k => `
+    <div class="period-card" onclick="selectPeriod('${k}','${periods[k].name}')">
+      <div>
+        <div class="pc-name">${periods[k].name}</div>
+        <div class="pc-date">${periods[k].createdAt||''}</div>
+      </div>
+      <i class="fas fa-chevron-right" style="color:var(--text-muted)"></i>
+    </div>
+  `).join('');
+}
+
+function createPeriod() {
+  const name = document.getElementById('new-period-name').value.trim();
+  if (!name) { showToast('Ingresa un nombre', 'error'); return; }
+  const id = 'period_' + Date.now();
+  const now = new Date().toLocaleDateString('es-EC');
+  db.ref(`periods/${id}`).set({ name, createdAt: now }).then(() => {
+    selectPeriod(id, name);
+  });
+}
+
+function selectPeriod(id, name) {
+  STATE.currentPeriodId = id;
+  STATE.currentPeriodName = name;
+  document.getElementById('period-label').textContent = '📁 ' + name;
+  closeModal('period-modal');
+  loadPeriodData(id);
+}
+
+function loadPeriodData(id) {
+  if (dbRef) dbRef.off();
+  dbRef = db.ref(`periods/${id}/data`);
+  dbRef.on('value', snap => {
+    const data = snap.val() || {};
+    STATE.records = data.records || {};
+    STATE.budgets = data.budgets || {};
+    STATE.savingsBase = data.savingsBase || 0;
+    STATE.savingsMovements = data.savingsMovements ? Object.values(data.savingsMovements) : [];
+    document.getElementById('savings-base-input').value = STATE.savingsBase || '';
+    updateSummary();
+    renderRecords();
+    renderBudget();
+    renderSavingsTrace();
+  });
+}
+
+// ============================================================
+// PERSON & TYPE SELECTION
+// ============================================================
+function selectPerson(idx) {
+  STATE.selectedPerson = idx;
+  document.querySelectorAll('.person-btn').forEach((b,i) => b.classList.toggle('active', i===idx));
+  const person = STATE.settings.persons[idx];
+  if (person) {
+    const photoEl = document.getElementById('current-user-photo');
+    const tooltipEl = document.getElementById('current-user-tooltip');
+    const displayEl = document.getElementById('current-user-display');
+    photoEl.src = person.photo;
+    tooltipEl.textContent = person.name;
+    displayEl.style.display = 'block';
+    // Icon on person-btn
+    const btn = document.getElementById(`person-btn-${idx}`);
+    if (btn) {
+      const icon = btn.querySelector('i');
+      icon.style.backgroundImage = `url(${person.photo})`;
+    }
+  }
+}
+
+function selectType(type) {
+  STATE.selectedType = type;
+  document.getElementById('type-income').classList.toggle('active', type==='income');
+  document.getElementById('type-expense').classList.toggle('active', type==='expense');
+  document.getElementById('form-type-title').innerHTML = type==='income'
+    ? '<i class="fas fa-arrow-trend-up" style="color:var(--green)"></i> Detalle del Ingreso'
+    : '<i class="fas fa-arrow-trend-down" style="color:var(--red)"></i> Detalle del Gasto';
+  populateCategorySelect();
+  document.getElementById('budget-assign-wrap').style.display = 'none';
+  document.getElementById('send-savings-section').style.display = 'none';
+  hideSubItems();
+}
+
+function populateCategorySelect() {
+  const sel = document.getElementById('category-select');
+  const type = STATE.selectedType;
+  const options = type === 'income' ? STATE.settings.incomeTypes : STATE.settings.expenseTypes;
+  sel.innerHTML = '<option value="">-- Seleccionar --</option>' + (options||[]).map(o => `<option value="${o}">${o}</option>`).join('');
+}
+
+// ============================================================
+// CATEGORY CHANGE
+// ============================================================
+function onCategoryChange() {
+  const cat = document.getElementById('category-select').value;
+  const type = STATE.selectedType;
+  hideSubItems();
+  document.getElementById('detail-extra-wrap').style.display = 'none';
+  document.getElementById('budget-assign-wrap').style.display = 'none';
+  document.getElementById('send-savings-section').style.display = 'none';
+  document.getElementById('amount-wrap').style.display = 'block';
+
+  if (!cat) return;
+
+  if (type === 'income') {
+    if (cat === 'Sacado del Fondo' || cat === 'Otros Ingresos') {
+      document.getElementById('detail-extra-label').textContent = cat === 'Sacado del Fondo' ? 'Motivo/Detalle' : 'Especificar ingreso';
+      document.getElementById('detail-extra-wrap').style.display = 'block';
+    }
+  } else {
+    if (cat === 'Servicios Básicos') {
+      document.getElementById('sub-servicios').classList.add('show');
+      document.getElementById('amount-wrap').style.display = 'none';
+    } else if (cat === 'Alquiler') {
+      document.getElementById('sub-alquiler').classList.add('show');
+      document.getElementById('amount-wrap').style.display = 'none';
+    } else if (cat === 'Otros Gastos') {
+      document.getElementById('detail-extra-label').textContent = 'Especificar gasto';
+      document.getElementById('detail-extra-wrap').style.display = 'block';
+    }
+    document.getElementById('budget-assign-wrap').style.display = 'block';
+    updateBudgetHint();
+    updateRestante();
+  }
+}
+
+function hideSubItems() {
+  document.getElementById('sub-servicios').classList.remove('show');
+  document.getElementById('sub-alquiler').classList.remove('show');
+}
+
+function updateBudgetHint() {
+  const assigned = parseFloat(document.getElementById('budget-assign-input').value)||0;
+  const totalIncome = calcTotalIncome();
+  const available = totalIncome - calcTotalAssigned() + (STATE.budgets[document.getElementById('category-select').value]?.assigned||0);
+  const hint = document.getElementById('budget-available-hint');
+  hint.textContent = assigned > 0 ? `Disponible para asignar: $${(totalIncome - calcTotalAssigned()).toFixed(2)}` : `Puedes asignar hasta: $${(totalIncome - calcTotalAssigned()).toFixed(2)}`;
+}
+
+function updateRestante() {
+  const cat = document.getElementById('category-select').value;
+  const amount = parseFloat(document.getElementById('amount-input').value)||0;
+  const assigned = STATE.budgets[cat]?.assigned || parseFloat(document.getElementById('budget-assign-input').value)||0;
+  const spent = calcCategorySpent(cat);
+  const restante = assigned - spent - amount;
+  const hint = document.getElementById('restante-hint');
+  if (assigned > 0) {
+    hint.textContent = `Restante del presupuesto: $${Math.max(0,restante).toFixed(2)}`;
+    hint.style.color = restante < 0 ? 'var(--red)' : 'var(--green)';
+    if (restante > 0 && amount > 0) {
+      document.getElementById('send-savings-section').style.display = 'block';
+      document.getElementById('sobrante-amount').textContent = `Sobrante: $${restante.toFixed(2)}`;
+    } else {
+      document.getElementById('send-savings-section').style.display = 'none';
+    }
+  } else {
+    hint.textContent = '';
+    document.getElementById('send-savings-section').style.display = 'none';
+  }
+}
+
+// ============================================================
+// CALCULATIONS
+// ============================================================
+function calcTotalIncome() {
+  return Object.values(STATE.records).filter(r=>r.type==='income').reduce((s,r)=>s+(r.amount||0),0);
+}
+function calcTotalExpense() {
+  return Object.values(STATE.records).filter(r=>r.type==='expense').reduce((s,r)=>s+(r.amount||0),0);
+}
+function calcTotalAssigned() {
+  return Object.values(STATE.budgets).reduce((s,b)=>s+(b.assigned||0),0);
+}
+function calcCategorySpent(cat) {
+  return Object.values(STATE.records).filter(r=>r.type==='expense'&&r.category===cat).reduce((s,r)=>s+(r.amount||0),0);
+}
+function calcSavingsTotal() {
+  return STATE.savingsBase + STATE.savingsMovements.reduce((s,m)=>s+(m.amount||0),0);
+}
+
+function updateSummary() {
+  const income = calcTotalIncome();
+  const expense = calcTotalExpense();
+  const current = income - expense;
+  const assigned = calcTotalAssigned();
+  const savings = calcSavingsTotal();
+  document.getElementById('sum-income').textContent = `$${income.toFixed(2)}`;
+  document.getElementById('sum-expense').textContent = `$${expense.toFixed(2)}`;
+  document.getElementById('sum-current').textContent = `$${current.toFixed(2)}`;
+  document.getElementById('sum-assigned').textContent = `$${assigned.toFixed(2)}`;
+  document.getElementById('sum-savings').textContent = `$${savings.toFixed(2)}`;
+  document.getElementById('mini-income').textContent = `$${income.toFixed(2)}`;
+  document.getElementById('mini-expense').textContent = `$${expense.toFixed(2)}`;
+  document.getElementById('mini-current').textContent = `$${current.toFixed(2)}`;
+  document.getElementById('mini-assigned').textContent = `$${assigned.toFixed(2)}`;
+  document.getElementById('mini-savings').textContent = `$${savings.toFixed(2)}`;
+  document.getElementById('savings-total-display').textContent = `$${savings.toFixed(2)}`;
+  if (document.getElementById('savings-base-input').value === '') {
+    document.getElementById('savings-base-input').value = STATE.savingsBase || '';
+  }
+}
+
+// ============================================================
+// SAVE RECORD
+// ============================================================
+function saveRecord() {
+  if (!STATE.currentPeriodId) { showToast('Selecciona un registro primero', 'error'); return; }
+  if (!STATE.selectedType) { showToast('Selecciona Ingreso o Gasto', 'error'); return; }
+  const cat = document.getElementById('category-select').value;
+  if (!cat) { showToast('Selecciona una categoría', 'error'); return; }
+
+  const date = document.getElementById('date-input').value;
+  const desc = document.getElementById('desc-input').value.trim();
+  const person = STATE.settings.persons[STATE.selectedPerson];
+  const detailExtra = document.getElementById('detail-extra').value.trim();
+
+  let amount = 0;
+  let subItems = null;
+
+  if (cat === 'Servicios Básicos') {
+    const agua = parseFloat(document.getElementById('srv-agua').value)||0;
+    const luz = parseFloat(document.getElementById('srv-luz').value)||0;
+    const internet = parseFloat(document.getElementById('srv-internet').value)||0;
+    amount = agua + luz + internet;
+    subItems = { agua, luz, internet };
+    if (amount === 0) { showToast('Ingresa al menos un valor de servicio', 'error'); return; }
+  } else if (cat === 'Alquiler') {
+    const alq = parseFloat(document.getElementById('alq-alquiler').value)||0;
+    const alic = parseFloat(document.getElementById('alq-alicuota').value)||0;
+    amount = alq + alic;
+    subItems = { alquiler: alq, alicuota: alic };
+  } else {
+    amount = parseFloat(document.getElementById('amount-input').value)||0;
+    if (amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
+  }
+
+  // Save budget assignment if expense
+  if (STATE.selectedType === 'expense') {
+    const budgetVal = parseFloat(document.getElementById('budget-assign-input').value)||0;
+    if (budgetVal > 0) {
+      STATE.budgets[cat] = STATE.budgets[cat] || {};
+      STATE.budgets[cat].assigned = budgetVal;
+    }
+  }
+
+  // Handle "Sacado del Fondo"
+  if (cat === 'Sacado del Fondo' && STATE.selectedType === 'income') {
+    const movId = 'mov_' + Date.now();
+    const mov = {
+      type: 'out', amount: -amount, date, desc: detailExtra || 'Sacado del fondo',
+      person: person?.name
+    };
+    STATE.savingsMovements.push(mov);
+    db.ref(`periods/${STATE.currentPeriodId}/data/savingsMovements/${movId}`).set(mov);
+  }
+
+  const record = {
+    id: 'rec_' + Date.now(),
+    type: STATE.selectedType,
+    category: cat,
+    amount,
+    date,
+    desc,
+    detailExtra,
+    subItems,
+    person: person?.name,
+    personPhoto: person?.photo,
+    createdAt: new Date().toISOString()
+  };
+
+  if (currentPhotoData) record.photo = currentPhotoData;
+
+  STATE.records[record.id] = record;
+  db.ref(`periods/${STATE.currentPeriodId}/data/records/${record.id}`).set(record);
+  if (STATE.budgets && Object.keys(STATE.budgets).length > 0) {
+    db.ref(`periods/${STATE.currentPeriodId}/data/budgets`).set(STATE.budgets);
+  }
+
+  showToast('✅ Registro guardado', 'success');
+  resetForm();
+  updateSummary();
+  renderRecords();
+  renderBudget();
+}
+
+function resetForm() {
+  document.getElementById('category-select').value = '';
+  document.getElementById('amount-input').value = '';
+  document.getElementById('desc-input').value = '';
+  document.getElementById('detail-extra').value = '';
+  document.getElementById('budget-assign-input').value = '';
+  document.getElementById('srv-agua').value = '';
+  document.getElementById('srv-luz').value = '';
+  document.getElementById('srv-internet').value = '';
+  document.getElementById('photo-input').value = '';
+  document.getElementById('photo-preview').src = '';
+  document.getElementById('photo-preview').classList.remove('show');
+  document.getElementById('restante-hint').textContent = '';
+  document.getElementById('detail-extra-wrap').style.display = 'none';
+  document.getElementById('budget-assign-wrap').style.display = 'none';
+  document.getElementById('send-savings-section').style.display = 'none';
+  hideSubItems();
+  currentPhotoData = null;
+  setDefaultDate();
+}
+
+// ============================================================
+// SEND TO SAVINGS
+// ============================================================
+function sendToSavings() {
+  const cat = document.getElementById('category-select').value;
+  const amount = parseFloat(document.getElementById('amount-input').value)||0;
+  const assigned = STATE.budgets[cat]?.assigned || parseFloat(document.getElementById('budget-assign-input').value)||0;
+  const spent = calcCategorySpent(cat);
+  const sobrante = assigned - spent - amount;
+  if (sobrante <= 0) { showToast('No hay sobrante para enviar', 'error'); return; }
+  const movId = 'mov_' + Date.now();
+  const mov = {
+    type: 'in', amount: sobrante,
+    date: document.getElementById('date-input').value,
+    desc: `Sobrante de ${cat}`,
+    person: STATE.settings.persons[STATE.selectedPerson]?.name
+  };
+  STATE.savingsMovements.push(mov);
+  db.ref(`periods/${STATE.currentPeriodId}/data/savingsMovements/${movId}`).set(mov);
+  showToast(`💜 $${sobrante.toFixed(2)} enviado al fondo`, 'success');
+  document.getElementById('send-savings-section').style.display = 'none';
+  updateSummary();
+  renderSavingsTrace();
+}
+
+function updateSavingsBase() {
+  const val = parseFloat(document.getElementById('savings-base-input').value)||0;
+  STATE.savingsBase = val;
+  db.ref(`periods/${STATE.currentPeriodId}/data/savingsBase`).set(val);
+  updateSummary();
+  showToast('Fondo base actualizado', 'success');
+}
+
+// ============================================================
+// RENDER RECORDS
+// ============================================================
+function renderRecords() {
+  const container = document.getElementById('records-list');
+  let recs = Object.values(STATE.records);
+  if (recordsFilter !== 'all') recs = recs.filter(r=>r.type===recordsFilter);
+  recs.sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0));
+  if (recs.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.82rem;">No hay registros</p>';
+    return;
+  }
+  container.innerHTML = recs.map(r => {
+    const sign = r.type==='income' ? '+' : '-';
+    const cls = r.type==='income' ? 'income-rec pos' : 'expense-rec neg';
+    const photo = r.personPhoto || '';
+    const subDetail = r.subItems ? Object.entries(r.subItems).map(([k,v])=>`${k}: $${v}`).join(' | ') : '';
+    return `<div class="record-item ${r.type}-rec">
+      <div style="position:relative;">
+        <img class="record-user-icon" src="${photo}" alt="${r.person||''}" title="${r.person||''}">
+      </div>
+      <div class="record-info">
+        <div class="record-title">${r.category}${r.detailExtra ? ' - '+r.detailExtra : ''}</div>
+        <div class="record-sub">${r.person||''} · ${r.date||''}${r.desc ? ' · '+r.desc : ''}${subDetail ? '<br>'+subDetail : ''}</div>
+      </div>
+      ${r.photo ? `<img src="${r.photo}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;">` : ''}
+      <div class="record-amount ${r.type==='income'?'pos':'neg'}">${sign}$${(r.amount||0).toFixed(2)}</div>
+      <button class="record-delete" onclick="deleteRecord('${r.id}')"><i class="fas fa-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+
+function filterRecords(f) { recordsFilter = f; renderRecords(); }
+
+function deleteRecord(id) {
+  delete STATE.records[id];
+  db.ref(`periods/${STATE.currentPeriodId}/data/records/${id}`).remove();
+  updateSummary(); renderRecords(); renderBudget();
+  showToast('Registro eliminado', 'success');
+}
+
+// ============================================================
+// RENDER BUDGET
+// ============================================================
+function renderBudget() {
+  const container = document.getElementById('budget-list');
+  const cats = Object.keys(STATE.budgets);
+  if (cats.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.82rem;">Asigna presupuesto al registrar gastos</p>';
+    return;
+  }
+  container.innerHTML = cats.map(cat => {
+    const b = STATE.budgets[cat];
+    const assigned = b.assigned || 0;
+    const spent = calcCategorySpent(cat);
+    const pct = assigned > 0 ? Math.min(100, (spent/assigned)*100) : 0;
+    const fillCls = pct < 70 ? 'ok' : pct < 90 ? 'warn' : 'over';
+    return `<div class="budget-row">
+      <div class="budget-row-label">
+        <span>${cat}</span>
+        <span style="color:var(--text-muted)">$${spent.toFixed(2)} / $${assigned.toFixed(2)}</span>
+      </div>
+      <div class="budget-bar"><div class="budget-fill ${fillCls}" style="width:${pct}%"></div></div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Disponible: $${Math.max(0,assigned-spent).toFixed(2)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// RENDER SAVINGS TRACE
+// ============================================================
+function renderSavingsTrace() {
+  const container = document.getElementById('savings-trace-list');
+  const movs = [...STATE.savingsMovements].reverse();
+  if (movs.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.8rem;">Sin movimientos</p>';
+    return;
+  }
+  container.innerHTML = movs.map(m => `
+    <div class="savings-detail ${m.type==='out'?'out':''}">
+      <div class="savings-info">
+        <div class="s-title">${m.desc||'Movimiento'}</div>
+        <div class="s-sub">${m.person||''} · ${m.date||''}</div>
+      </div>
+      <div class="savings-amount ${m.type==='out'?'neg':''}">${m.type==='out'?'-':'+' }$${Math.abs(m.amount||0).toFixed(2)}</div>
+    </div>
+  `).join('');
+
+  // Modal detail
+  const modalList = document.getElementById('savings-detail-list');
+  if (modalList) modalList.innerHTML = container.innerHTML;
+}
+
+// ============================================================
+// CONFIRM NEW QUINCENA
+// ============================================================
+function confirmNewQuincena() {
+  document.getElementById('confirm-text').textContent = '¿Estás seguro de Iniciar Nueva Quincena? Se perderán los datos del Registro Actual en esta vista y deberás crear un nuevo período.';
+  document.getElementById('confirm-yes').onclick = () => {
+    closeModal('confirm-modal');
+    STATE.records = {};
+    STATE.budgets = {};
+    updateSummary(); renderRecords(); renderBudget();
+    showModal('period-modal');
+    db.ref('periods').once('value').then(snap => renderPeriodList(snap.val()||{}));
+  };
+  showModal('confirm-modal');
+}
+
+// ============================================================
+// PHOTO
+// ============================================================
+function onPhotoChange(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentPhotoData = e.target.result;
+    const prev = document.getElementById('photo-preview');
+    prev.src = currentPhotoData;
+    prev.classList.add('show');
+  };
+  reader.readAsDataURL(file);
+}
+
+// ============================================================
+// EXPORT EXCEL
+// ============================================================
+function exportExcel() {
+  const recs = Object.values(STATE.records);
+  const wsData = [
+    ['Fecha','Persona','Tipo','Categoría','Detalle','Monto','Período'],
+    ...recs.map(r => [r.date||'', r.person||'', r.type==='income'?'Ingreso':'Gasto', r.category||'', (r.detailExtra||r.desc||''), r.amount||0, STATE.currentPeriodName])
+  ];
+  // Savings
+  wsData.push([]);
+  wsData.push(['--- FONDO DE AHORRO ---','','','','','','']);
+  wsData.push(['Fecha','Persona','Tipo','Descripción','Monto','','']);
+  STATE.savingsMovements.forEach(m => wsData.push([m.date||'',m.person||'',m.type==='in'?'Ingreso al Fondo':'Retiro del Fondo',m.desc||'',m.amount||0,'','']));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
+  XLSX.writeFile(wb, `Registros_${STATE.currentPeriodName||'export'}.xlsx`);
+  showToast('📊 Excel exportado', 'success');
+}
+
+// ============================================================
+// EXPORT PDF
+// ============================================================
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(12);
+  doc.text(STATE.settings.familyName, 14, 14);
+  doc.setFontSize(9);
+  doc.text(`Período: ${STATE.currentPeriodName}`, 14, 22);
+  doc.text(`Exportado: ${new Date().toLocaleDateString('es-EC')}`, 14, 28);
+  const recs = Object.values(STATE.records);
+  doc.autoTable({
+    startY: 34,
+    head: [['Fecha','Persona','Tipo','Categoría','Detalle','Monto']],
+    body: recs.map(r => [r.date||'',r.person||'',r.type==='income'?'Ingreso':'Gasto',r.category||'',(r.detailExtra||r.desc||''),`$${(r.amount||0).toFixed(2)}`]),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [26,39,68] }
+  });
+  const finalY = doc.lastAutoTable.finalY + 10;
+  doc.text(`Total Ingresos: $${calcTotalIncome().toFixed(2)}`, 14, finalY);
+  doc.text(`Total Gastos: $${calcTotalExpense().toFixed(2)}`, 14, finalY+6);
+  doc.text(`Fondo de Ahorro: $${calcSavingsTotal().toFixed(2)}`, 14, finalY+12);
+  doc.save(`Registros_${STATE.currentPeriodName||'export'}.pdf`);
+  showToast('📄 PDF exportado', 'success');
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'savings') renderSavingsTrace();
+  if (name === 'records') renderRecords();
+  if (name === 'budget') renderBudget();
+}
+
+// ============================================================
+// MODALS
+// ============================================================
+function showModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type='') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ============================================================
+// PWA INSTALL
+// ============================================================
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+document.getElementById('install-banner').addEventListener('click', () => {
+  if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; document.getElementById('install-banner').classList.remove('show'); }
+});
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+// Init default type
+selectType('income');
+selectPerson(0);
+</script>
+</body>
+</html>
