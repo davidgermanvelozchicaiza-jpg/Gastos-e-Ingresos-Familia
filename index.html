@@ -241,8 +241,18 @@ body {
   background: rgba(240,180,41,0.1);
   box-shadow: 0 0 12px rgba(240,180,41,0.25);
 }
-.person-btn i { display: block; font-size: 1.5rem; margin-bottom: 4px; transition: transform 0.3s, font-size 0.3s; }
-.person-btn:hover i { transform: scale(1.3); font-size: 1.8rem; }
+.person-btn .person-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--border);
+  margin: 0 auto 6px auto; display: block;
+  transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+.person-btn.active .person-avatar {
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(240,180,41,0.5);
+}
+.person-btn:hover .person-avatar { transform: scale(1.12); }
 
 /* TYPE SELECTOR */
 .type-selector { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -554,6 +564,10 @@ body {
     <div class="sum-card assigned">
       <div class="sum-label">📋 Asignado</div>
       <div class="sum-value" id="sum-assigned">$0.00</div>
+      <div style="margin-top:6px;background:rgba(6,214,160,0.12);border:1px solid rgba(6,214,160,0.3);border-radius:8px;padding:4px 6px;">
+        <div style="font-size:0.6rem;color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">💚 Ahorrando</div>
+        <div style="font-size:0.85rem;font-weight:900;color:var(--green);" id="sum-saving-from-assigned">$0.00</div>
+      </div>
     </div>
     <div class="sum-card savings" onclick="showModal('savings-modal')" style="cursor:pointer;">
       <div class="sum-label">🐷 Ahorro</div>
@@ -584,11 +598,11 @@ body {
       <div class="card-title"><i class="fas fa-user-friends"></i> ¿Quién registra?</div>
       <div class="person-selector">
         <div class="person-btn active" id="person-btn-0" onclick="selectPerson(0)">
-          <i class="fas fa-user-circle"></i>
+          <img class="person-avatar" id="person-avatar-0" src="" alt="David">
           <span id="person-name-0">David</span>
         </div>
         <div class="person-btn" id="person-btn-1" onclick="selectPerson(1)">
-          <i class="fas fa-user-circle"></i>
+          <img class="person-avatar" id="person-avatar-1" src="" alt="Doménica">
           <span id="person-name-1">Doménica</span>
         </div>
       </div>
@@ -681,9 +695,17 @@ body {
       <!-- Photo -->
       <div class="form-group">
         <label class="form-label">Foto (opcional)</label>
-        <input type="file" class="form-control" id="photo-input" accept="image/*" capture="environment" onchange="onPhotoChange(event)">
+        <input type="file" class="form-control" id="photo-input-gallery" accept="image/*" style="display:none;" onchange="onPhotoChange(event)">
+        <input type="file" class="form-control" id="photo-input-camera" accept="image/*" capture="environment" style="display:none;" onchange="onPhotoChange(event)">
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button type="button" class="btn btn-outline flex-1" onclick="document.getElementById('photo-input-camera').click()">
+            <i class="fas fa-camera"></i> Tomar Foto
+          </button>
+          <button type="button" class="btn btn-outline flex-1" onclick="document.getElementById('photo-input-gallery').click()">
+            <i class="fas fa-images"></i> Galería
+          </button>
+        </div>
         <img class="photo-preview" id="photo-preview" src="" alt="">
-        <div class="hint"><i class="fas fa-camera"></i> Toma foto o selecciona de galería</div>
       </div>
 
       <!-- Restante and send to savings -->
@@ -741,6 +763,20 @@ body {
   <div class="tab-panel" id="panel-budget">
     <div class="card">
       <div class="card-title"><i class="fas fa-chart-pie"></i> Presupuesto por Categoría</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;font-size:0.72rem;text-align:center;">
+        <div style="background:var(--navy);border-radius:8px;padding:6px;">
+          <div style="color:var(--text-muted);font-weight:700;">Total Asignado</div>
+          <div style="color:var(--blue);font-weight:900;" id="budget-total-assigned">$0.00</div>
+        </div>
+        <div style="background:var(--navy);border-radius:8px;padding:6px;">
+          <div style="color:var(--text-muted);font-weight:700;">Total Gastado</div>
+          <div style="color:var(--red);font-weight:900;" id="budget-total-spent">$0.00</div>
+        </div>
+        <div style="background:var(--navy);border-radius:8px;padding:6px;">
+          <div style="color:var(--text-muted);font-weight:700;">Total Sobrante</div>
+          <div style="color:var(--green);font-weight:900;" id="budget-total-sobrante">$0.00</div>
+        </div>
+      </div>
       <div id="budget-list">
         <p style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.82rem;">Sin datos de presupuesto</p>
       </div>
@@ -860,12 +896,14 @@ async function loadSettings() {
 function applySettings() {
   document.getElementById('header-title').textContent = STATE.settings.familyName;
   document.title = 'REGISTROS - ' + STATE.settings.familyName;
-  // Person names
+  // Person names and avatars
   for (let i=0;i<2;i++) {
     const p = STATE.settings.persons[i];
     if (p) {
-      const el = document.getElementById(`person-name-${i}`);
-      if (el) el.textContent = p.name;
+      const nameEl = document.getElementById(`person-name-${i}`);
+      const avatarEl = document.getElementById(`person-avatar-${i}`);
+      if (nameEl) nameEl.textContent = p.name;
+      if (avatarEl) avatarEl.src = p.photo || '';
     }
   }
   populateCategorySelect();
@@ -978,12 +1016,6 @@ function selectPerson(idx) {
     photoEl.src = person.photo;
     tooltipEl.textContent = person.name;
     displayEl.style.display = 'block';
-    // Icon on person-btn
-    const btn = document.getElementById(`person-btn-${idx}`);
-    if (btn) {
-      const icon = btn.querySelector('i');
-      icon.style.backgroundImage = `url(${person.photo})`;
-    }
   }
 }
 
@@ -1049,11 +1081,14 @@ function hideSubItems() {
 }
 
 function updateBudgetHint() {
-  const assigned = parseFloat(document.getElementById('budget-assign-input').value)||0;
+  const cat = document.getElementById('category-select').value;
   const totalIncome = calcTotalIncome();
-  const available = totalIncome - calcTotalAssigned() + (STATE.budgets[document.getElementById('category-select').value]?.assigned||0);
+  const currentAssigned = calcTotalAssigned();
+  // Exclude the already-assigned value for this cat from the total so it doesn't double-count
+  const thisCatAssigned = STATE.budgets[cat]?.assigned || 0;
+  const availableToAssign = totalIncome - currentAssigned + thisCatAssigned;
   const hint = document.getElementById('budget-available-hint');
-  hint.textContent = assigned > 0 ? `Disponible para asignar: $${(totalIncome - calcTotalAssigned()).toFixed(2)}` : `Puedes asignar hasta: $${(totalIncome - calcTotalAssigned()).toFixed(2)}`;
+  hint.textContent = `Puedes asignar hasta: ($${totalIncome.toFixed(2)} - $${(currentAssigned - thisCatAssigned).toFixed(2)}) = $${availableToAssign.toFixed(2)}`;
 }
 
 function updateRestante() {
@@ -1100,13 +1135,18 @@ function calcSavingsTotal() {
 function updateSummary() {
   const income = calcTotalIncome();
   const expense = calcTotalExpense();
+  // TENGO = Total Ingresos - Total Gastos individuales registrados
   const current = income - expense;
+  // ASIGNADO = suma de valores asignados a rubros de gasto
   const assigned = calcTotalAssigned();
+  // Ahorrando de lo Asignado = Asignado - lo realmente gastado (expense)
+  const savingFromAssigned = Math.max(0, assigned - expense);
   const savings = calcSavingsTotal();
   document.getElementById('sum-income').textContent = `$${income.toFixed(2)}`;
   document.getElementById('sum-expense').textContent = `$${expense.toFixed(2)}`;
   document.getElementById('sum-current').textContent = `$${current.toFixed(2)}`;
   document.getElementById('sum-assigned').textContent = `$${assigned.toFixed(2)}`;
+  document.getElementById('sum-saving-from-assigned').textContent = `$${savingFromAssigned.toFixed(2)}`;
   document.getElementById('sum-savings').textContent = `$${savings.toFixed(2)}`;
   document.getElementById('mini-income').textContent = `$${income.toFixed(2)}`;
   document.getElementById('mini-expense').textContent = `$${expense.toFixed(2)}`;
@@ -1211,7 +1251,8 @@ function resetForm() {
   document.getElementById('srv-agua').value = '';
   document.getElementById('srv-luz').value = '';
   document.getElementById('srv-internet').value = '';
-  document.getElementById('photo-input').value = '';
+  document.getElementById('photo-input-gallery').value = '';
+  document.getElementById('photo-input-camera').value = '';
   document.getElementById('photo-preview').src = '';
   document.getElementById('photo-preview').classList.remove('show');
   document.getElementById('restante-hint').textContent = '';
@@ -1303,6 +1344,17 @@ function deleteRecord(id) {
 function renderBudget() {
   const container = document.getElementById('budget-list');
   const cats = Object.keys(STATE.budgets);
+  // Update budget summary row
+  const totalAssigned = calcTotalAssigned();
+  const totalSpent = calcTotalExpense();
+  const totalSobrante = Math.max(0, totalAssigned - totalSpent);
+  const taEl = document.getElementById('budget-total-assigned');
+  const tsEl = document.getElementById('budget-total-spent');
+  const tsoEl = document.getElementById('budget-total-sobrante');
+  if (taEl) taEl.textContent = `$${totalAssigned.toFixed(2)}`;
+  if (tsEl) tsEl.textContent = `$${totalSpent.toFixed(2)}`;
+  if (tsoEl) tsoEl.textContent = `$${totalSobrante.toFixed(2)}`;
+
   if (cats.length === 0) {
     container.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.82rem;">Asigna presupuesto al registrar gastos</p>';
     return;
@@ -1311,17 +1363,53 @@ function renderBudget() {
     const b = STATE.budgets[cat];
     const assigned = b.assigned || 0;
     const spent = calcCategorySpent(cat);
+    const sobrante = Math.max(0, assigned - spent);
     const pct = assigned > 0 ? Math.min(100, (spent/assigned)*100) : 0;
     const fillCls = pct < 70 ? 'ok' : pct < 90 ? 'warn' : 'over';
+    const sobranteHTML = sobrante > 0 ? `
+      <div class="send-savings-wrap" style="margin-top:8px;padding:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div>
+            <span style="font-size:0.7rem;color:#a78bfa;font-weight:700;">💚 Sobrante de este rubro:</span>
+            <strong style="color:#a78bfa;font-size:0.88rem;margin-left:4px;">$${sobrante.toFixed(2)}</strong>
+          </div>
+          <button class="btn btn-sm" style="background:#a78bfa;color:var(--navy);" onclick="sendCategoryToSavings('${cat}',${sobrante})">
+            <i class="fas fa-piggy-bank"></i> Enviar al Fondo
+          </button>
+        </div>
+      </div>` : '';
     return `<div class="budget-row">
       <div class="budget-row-label">
-        <span>${cat}</span>
-        <span style="color:var(--text-muted)">$${spent.toFixed(2)} / $${assigned.toFixed(2)}</span>
+        <span style="font-weight:800;">${cat}</span>
+        <span style="color:var(--text-muted)">$${spent.toFixed(2)} gastado / $${assigned.toFixed(2)} asignado</span>
       </div>
       <div class="budget-bar"><div class="budget-fill ${fillCls}" style="width:${pct}%"></div></div>
-      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Disponible: $${Math.max(0,assigned-spent).toFixed(2)}</div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">
+        Disponible: <strong style="color:${sobrante>0?'var(--green)':'var(--red)'}">$${sobrante.toFixed(2)}</strong>
+        &nbsp;·&nbsp; ${pct.toFixed(0)}% ejecutado
+      </div>
+      ${sobranteHTML}
     </div>`;
   }).join('');
+}
+
+function sendCategoryToSavings(cat, sobrante) {
+  if (!STATE.currentPeriodId) { showToast('Selecciona un período primero', 'error'); return; }
+  const movId = 'mov_' + Date.now();
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const mov = {
+    type: 'in', amount: sobrante,
+    date: dateStr,
+    desc: `Sobrante de ${cat}`,
+    person: STATE.settings.persons[STATE.selectedPerson]?.name || ''
+  };
+  STATE.savingsMovements.push(mov);
+  db.ref(`periods/${STATE.currentPeriodId}/data/savingsMovements/${movId}`).set(mov);
+  showToast(`💜 $${sobrante.toFixed(2)} de "${cat}" enviado al Fondo`, 'success');
+  updateSummary();
+  renderSavingsTrace();
+  renderBudget();
 }
 
 // ============================================================
